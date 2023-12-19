@@ -4,22 +4,25 @@ use std::time::Duration;
 use std::io::BufReader;
 use std::io::{stdin,stdout,Write};
 
-fn main() -> std::io::Result<()> {
+fn main() {
     if let Ok(mut stream) = TcpStream::connect("127.0.0.1:7878") {
         println!("Connected to the server!");
 
         loop {
-            print!("Please enter text to send: ");
+            print!("Enter text to send: ");
             
             let mut data = String::new();
             let _ = stdout().flush();
             stdin().read_line(&mut data).expect("Did not enter a correct string");
-            data += "\r\n";
+            data += "\n"; // new line to indicate EOF
 
-            stream.write_all(&data.as_bytes())?;
-            println!("data sent: {}", &data);
+            match stream.write_all(&data.as_bytes()) {
+                Ok(_) => println!("data sent: {:?}", &data.as_bytes()),
+                Err(err) => println!("error responding to server; {}", err.to_string())
+            };
 
-            // let _ = stream.set_read_timeout(Some(Duration::new(2, 0)));
+            let _ = stream.set_read_timeout(Some(Duration::new(3, 0)));
+
             let buf_reader = BufReader::new(&mut stream);
             let response: Vec<_> = buf_reader
                 .lines()
@@ -27,12 +30,9 @@ fn main() -> std::io::Result<()> {
                 .take_while(|line| !line.is_empty())
                 .collect();
 
-            stream.flush()?;
-            println!("received: {}", response.join("\n"));
+            println!("received: {:?}", &response);
         }
     } else {
         println!("Couldn't connect to server...");
     }
-
-    Ok(())
 }
