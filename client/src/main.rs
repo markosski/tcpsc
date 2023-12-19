@@ -1,11 +1,18 @@
 use std::io::prelude::*;
-use std::net::TcpStream;
 use std::time::Duration;
 use std::io::BufReader;
 use std::io::{stdin,stdout,Write};
+use std::net::{SocketAddr, TcpStream};
+use std::env;
 
 fn main() {
-    if let Ok(mut stream) = TcpStream::connect("127.0.0.1:7878") {
+    let args: Vec<String> = env::args().collect();
+    if args.len() != 2 {
+        panic!("Please provide port number");
+    }
+    let port: u16 = args[1].parse().expect("valid port number");
+
+    if let Ok(mut stream) = TcpStream::connect(SocketAddr::from(([127, 0, 0, 1], port))) {
         println!("Connected to the server!");
 
         loop {

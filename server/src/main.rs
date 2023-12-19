@@ -5,13 +5,18 @@ use std::io::BufReader;
 use threadpool::ThreadPool;
 use std::thread;
 use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::env;
 
 fn main() {
-    let port = 7878;
+    let args: Vec<String> = env::args().collect();
+    if args.len() != 2 {
+        panic!("Please provide port number");
+    }
+    let port: u16 = args[1].parse().expect("valid port number");
     let listener = TcpListener::bind(SocketAddr::from(([127, 0, 0, 1], port)),).unwrap();
     let pool = ThreadPool::new(4);
 
-    println!("Server started on port {}!", &port);
+    println!("server started on port {}!", &port);
     loop {
         match listener.accept() {
             Ok((stream, addr)) => {
