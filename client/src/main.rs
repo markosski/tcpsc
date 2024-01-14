@@ -1,9 +1,9 @@
-use std::io::prelude::*;
-use std::time::Duration;
-use std::io::BufReader;
 use std::io::{stdin,stdout,Write};
-use std::net::{SocketAddr, TcpStream};
 use std::env;
+use core::models::Header;
+use core::utils;
+use core::client::Client;
+use std::str;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -12,34 +12,22 @@ fn main() {
     }
     let port: u16 = args[1].parse().expect("valid port number");
 
-    if let Ok(mut stream) = TcpStream::connect(SocketAddr::from(([127, 0, 0, 1], port))) {
-        println!("Connected to the server!");
-
+    if let Ok(mut client) = Client::new([127,0,0,1], port, 3) {
         loop {
             print!("Enter text to send: ");
-            
             let mut data = String::new();
             let _ = stdout().flush();
             stdin().read_line(&mut data).expect("Did not enter a correct string");
-            data += "\n"; // new line to indicate EOF
+            let data_bytes = data.into_bytes();
 
-            match stream.write_all(&data.as_bytes()) {
-                Ok(_) => println!("data sent: {:?}", &data.as_bytes()),
-                Err(err) => println!("error responding to server; {}", err.to_string())
-            };
+            let msg_type: [u8; 4] = utils::to_array::<4>("REQ ");
+            let msg_client_id: [u8; 8] = utils::to_array::<8>("abc12300");
+            let header = Header::new(msg_type, msg_client_id, data_bytes.len() as u32);
 
-            let _ = stream.set_read_timeout(Some(Duration::new(3, 0)));
-
-            let buf_reader = BufReader::new(&mut stream);
-            let response: Vec<_> = buf_reader
-                .lines()
-                .map(|result| result.unwrap())
-                .take_while(|line| !line.is_empty())
-                .collect();
-
-            println!("received: {:?}", &response);
+            match client.send(header, data_bytes) {
+                Ok(resp) => println!("{:?}", str::from_utf8(&resp)),
+                Err(e) => println!("{}", e.to_string())
+            }
         }
-    } else {
-        println!("Couldn't connect to server...");
     }
 }

@@ -2,58 +2,33 @@
 
 use std::io::prelude::*;
 use std::io::BufReader;
+use std::time::Duration;
 use threadpool::ThreadPool;
 use std::thread;
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::env;
+use std::str;
+use std::sync::Arc;
+use core::server::Server;
+
+fn handler(header: &Vec<u8>, payload: &Vec<u8>) -> Vec<u8> {
+    let header_string = str::from_utf8(&header).unwrap();
+    let payload_string = str::from_utf8(&payload).unwrap();
+    println!("header string is {}", &header_string);
+
+    let payload_str = str::from_utf8(&payload).unwrap();
+    (String::from("response data: ") + payload_str).as_bytes().to_vec()
+}
 
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() != 2 {
         panic!("Please provide port number");
     }
-    let port: u16 = args[1].parse().expect("valid port number");
-    let listener = TcpListener::bind(SocketAddr::from(([127, 0, 0, 1], port)),).unwrap();
-    let pool = ThreadPool::new(4);
+    static POOL_SIZE: usize = 2;
+    let port = args[1].parse().expect("valid port number");
+    let pool: ThreadPool = ThreadPool::new(POOL_SIZE);
 
-    println!("server started on port {}!", &port);
-    loop {
-        match listener.accept() {
-            Ok((stream, addr)) => {
-                println!("incoming connection from remote client: {}:{}", &addr.ip(), &addr.port());
-                pool.execute(|| {
-                    println!("starting session on thread {:?}...", &thread::current().id());
-                    handler(stream);
-                    println!("thread {:?} completed", &thread::current().id());
-                });
-            },
-            Err(e) => println!("couldn't get client: {e:?}"),
-        }
-    }
-}
-
-fn handler(mut stream: TcpStream) {
-    loop {
-        let buf_reader = BufReader::new(&mut stream);
-        let request_data: Vec<_> = buf_reader
-            .lines()
-            .map(|result| result.unwrap())
-            .take_while(|line| !line.is_empty())
-            .collect();
-
-        println!("received: {:?}", &request_data);
-
-        if request_data.len() == 0 {
-            println!("ending session...");
-            break;
-        }
-
-        let response_msg = request_data.join("");
-
-        let response_data = response_msg + "\n\n"; // extra blank line is needed to indicate EOF
-        match stream.write_all(response_data.as_bytes()) {
-            Ok(ok) => println!("response sent successfully!"),
-            Err(err) => println!("error sending response; {}", err.to_string())
-        }
-    }
+    let server = Server::new(16, &pool);
+    server.serve(port, Arc::new(handler));
 }
