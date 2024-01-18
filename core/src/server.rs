@@ -11,12 +11,18 @@ use std::env;
 use std::str;
 use std::sync::Arc;
 use std::io::ErrorKind;
+use std::sync::mpsc;
 use crate::utils;
 use crate::models::{Header, Message, Response};
 
 pub struct Server<'a> {
     header_size: usize,
     thread_pool: &'a ThreadPool
+}
+
+struct HandlerMessage {
+    stream: TcpStream,
+
 }
 
 impl<'a> Server<'a> {
@@ -46,9 +52,15 @@ impl<'a> Server<'a> {
 
                         self.thread_pool.execute(move || {
                             println!("starting session on thread {:?}...", &thread::current().id());
-                            Server::handle_message(stream, header_size, handler2);
 
-                            println!("thread {:?} completed", &thread::current().id());
+                            loop {
+                                let t = thread::spawn(|| {
+                                    let response = Server::handle_message(stream, header_size, handler2);
+                                });
+                                thread::sleep(std::time::Duration::new(2, 0));
+                            }
+
+                            println!("session completed on thread {:?}", &thread::current().id());
                         });
                     }
                 },
@@ -63,6 +75,8 @@ impl<'a> Server<'a> {
     {
         let header_size_less_one_byte = header_size - 1;
         loop {
+            println!("top of the loop...");
+
             let mut buf_reader = BufReader::new(&mut stream);
     
             let mut format_buf: Vec<u8> = vec![];
