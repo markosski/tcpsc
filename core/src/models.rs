@@ -92,6 +92,10 @@ impl Response {
         Response {message_length: message_length, data: data}
     }
 
+    pub fn empty() -> Response {
+        Response {message_length: 0, data: vec![]}
+    }
+
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut serialized = vec![];
         serialized.append(&mut utils::transform_u32_to_array_of_u8(self.message_length).to_vec());
