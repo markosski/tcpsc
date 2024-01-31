@@ -43,4 +43,8 @@ impl Client {
 
         Ok(message)
     }
+
+    pub fn close(&self) {
+        self.tcp.shutdown(std::net::Shutdown::Both).unwrap();
+    }
 }

@@ -29,6 +29,6 @@ fn main() {
     let port = args[1].parse().expect("valid port number");
     let pool: ThreadPool = ThreadPool::new(POOL_SIZE);
 
-    let server = Server::new(16, &pool);
+    let server = Server::new(16, 15, &pool);
     server.serve(port, Arc::new(handler));
 }
