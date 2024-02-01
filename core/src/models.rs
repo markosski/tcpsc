@@ -49,8 +49,10 @@ impl Header {
             Ok(
                 Header::new(message_type, sender_id, utils::as_u32_be(&message_length))
             )
+        } else if data.len() == 0 {
+            Err(Error::new(ErrorKind::Other, "no data to construct a header"))
         } else {
-            Err(Error::new(ErrorKind::Other, "data vector is to small to build a header"))
+            Err(Error::new(ErrorKind::Other, "data vector is too small to construct a header"))
         }
     }
 
@@ -90,6 +92,10 @@ pub struct Response {
 impl Response {
     pub fn new(message_length: u32, data: Vec<u8>) -> Response {
         Response {message_length: message_length, data: data}
+    }
+
+    pub fn empty() -> Response {
+        Response {message_length: 0, data: vec![]}
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
