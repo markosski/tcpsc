@@ -16,6 +16,9 @@ use std::sync::mpsc;
 use log::{debug, info, warn, error};
 use crate::utils;
 use crate::models::{Header, Message, Response};
+use crate::utils::GeneralError;
+use utils::Result;
+
 
 pub struct Server<'a> {
     header_size: usize,
@@ -47,7 +50,7 @@ impl<'a> Server<'a> {
 
     pub fn serve<F>(&self, port: u16, handler: F) -> Vec<u8> 
     where 
-        F: Fn(&Message) -> Result<Vec<u8>, Error> + Send + Sync + 'static
+        F: Fn(&Message) -> Result<Vec<u8>> + Send + Sync + 'static
     {
         let handler_ref_arc = Arc::new(handler);
         let listener = TcpListener::bind(SocketAddr::from(([127, 0, 0, 1], port)),).unwrap();
@@ -103,9 +106,9 @@ impl<'a> Server<'a> {
         } 
     }
 
-    fn handle_message<F>(mut tcp: &TcpStream, header_size: usize, timeout: usize, handler: Arc<F>) -> Result<Response, Error>
+    fn handle_message<F>(mut tcp: &TcpStream, header_size: usize, timeout: usize, handler: Arc<F>) -> Result<Response>
     where 
-        F: Fn(&Message) -> Result<Vec<u8>, Error> + Send + Sync
+        F: Fn(&Message) -> Result<Vec<u8>> + Send + Sync
     {
         let header_size_less_one_byte = header_size - 1;
 
@@ -127,7 +130,7 @@ impl<'a> Server<'a> {
 
         if header.message_length == 0 {
             debug!("message size is empty...");
-            return Err(Error::new(ErrorKind::Other, "message size is empty"));
+            return Err(GeneralError::new("message size is empty".to_string()));
         } else {
             debug!("message size is: {}", &header.message_length);
         }

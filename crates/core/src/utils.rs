@@ -1,3 +1,30 @@
+use std::error::Error;
+use std::fmt;
+
+pub type Result<T> = std::result::Result<T, std::boxed::Box<dyn Error>>;
+
+#[derive(Debug)]
+pub struct GeneralError {
+    message: String
+}
+
+impl GeneralError {
+    pub fn new(message: String) -> Box<GeneralError> {
+        Box::new(GeneralError{message: message})
+    }
+}
+
+impl fmt::Display for GeneralError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", &self.message)
+    }
+}
+
+impl Error for GeneralError {
+    fn description(&self) -> &str {
+        &self.message
+    }
+}
 
 pub fn vec_as_u32_be(vec: &Vec<u8>) -> u32 {
     let mut arr: [u8; 4] = [0; 4];

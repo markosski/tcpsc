@@ -1,11 +1,10 @@
-use std::io::Error;
 use std::{fmt, str};
-use std::io::ErrorKind;
 use std::str::FromStr;
 use std::io::BufReader;
 use std::io::Read;
 
-use crate::utils;
+use crate::utils::{self, GeneralError};
+use utils::Result;
 
 pub struct Header {
     pub message_type: [u8; 4],
@@ -41,7 +40,7 @@ impl Header {
         }
     }
 
-    pub fn from_bytes(data: &Vec<u8>) -> Result<Header, Error> {
+    pub fn from_bytes(data: &Vec<u8>) -> Result<Header> {
         if data.len() == 16 {
             let mut message_type: [u8; 4] = [0; 4];
             let mut sender_id: [u8; 8] = [0; 8];
@@ -54,9 +53,9 @@ impl Header {
                 Header::new(message_type, sender_id, utils::as_u32_be(&message_length))
             )
         } else if data.len() == 0 {
-            Err(Error::new(ErrorKind::Other, "no data to construct a header"))
+            Err(GeneralError::new( "no data to construct a header".to_string()))
         } else {
-            Err(Error::new(ErrorKind::Other, "data vector is too small to construct a header"))
+            Err(GeneralError::new( "data vector is too small to construct a header".to_string()))
         }
     }
 
@@ -64,17 +63,17 @@ impl Header {
         16 
     }
 
-    pub fn get_message_type_string(&self) -> Result<&str, Error> {
+    pub fn get_message_type_string(&self) -> Result<&str> {
         match str::from_utf8(&self.message_type) {
             Ok(ok) => Ok(ok),
-            Err(e) => Err(Error::new(ErrorKind::Other, e.to_string()))
+            Err(e) => Err(GeneralError::new(format!("{}", e)))
         }
     }
 
-    pub fn get_sender_id_string(&self) -> Result<&str, Error> {
+    pub fn get_sender_id_string(&self) -> Result<&str> {
         match str::from_utf8(&self.sender_id) {
             Ok(ok) => Ok(ok),
-            Err(e) => Err(Error::new(ErrorKind::Other, e.to_string()))
+            Err(e) => Err(GeneralError::new(format!("{}", e)))
         }
     }
 
@@ -109,13 +108,13 @@ impl fmt::Display for ResponseType {
 }
 
 impl FromStr for ResponseType {
-    type Err = ();
+    type Err = Box<dyn std::error::Error>;
 
-    fn from_str(input: &str) -> Result<ResponseType, Self::Err> {
+    fn from_str(input: &str) -> std::result::Result<ResponseType, Self::Err> {
         match input {
             "SUCC"  => Ok(ResponseType::SUCC),
             "ERR "  => Ok(ResponseType::ERR),
-            _      => Err(()),
+            _      => Err(GeneralError::new(format!("Could not create response type for name {}", &input))),
         }
     }
 }
@@ -178,7 +177,7 @@ impl Response {
         serialized
     }
 
-    pub fn from_buffer<T: Read>(buf: &mut BufReader<&mut T>) -> Result<Response, Error> {
+    pub fn from_buffer<T: Read>(buf: &mut BufReader<&mut T>) -> Result<Response> {
         let mut response_type: [u8; 4] = [0; 4];
         buf.read_exact(&mut response_type)?;
         let message_type_utf = str::from_utf8(&response_type).unwrap();
@@ -201,8 +200,7 @@ impl Response {
         }
     }
 
-    pub fn from_bytes(data: &Vec<u8>) -> Result<Response, Error> {
-        println!("size of this shit is {}", &data.len());
+    pub fn from_bytes(data: &Vec<u8>) -> Result<Response> {
         if data.len() >= 8 {
             let mut message_type: [u8; 4] = [0; 4];
             let mut message_length: [u8; 4] = [0; 4];
@@ -211,7 +209,6 @@ impl Response {
             message_length.copy_from_slice(&data[4..8]);
 
             let message_type_utf = str::from_utf8(&message_type).unwrap(); //TODO convert to Error
-            println!("debug {:?}", &message_type_utf);
             let response_type = ResponseType::from_str(message_type_utf);
 
             match response_type {
@@ -223,7 +220,7 @@ impl Response {
                 Err(_) => panic!("did not recognize response")
             }
         } else {
-            Err(Error::new(ErrorKind::Other, "data vector is too small to construct a response")) 
+            Err(GeneralError::new("data vector is too small to construct a response".to_string()))
         }
     }
 }
