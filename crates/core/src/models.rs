@@ -14,8 +14,8 @@ pub struct Header {
 }
 
 pub struct Message {
-    header: Header,
-    data: Vec<u8>
+    pub header: Header,
+    pub data: Vec<u8>
 }
 
 impl Message {

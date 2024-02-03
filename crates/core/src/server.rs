@@ -47,7 +47,7 @@ impl<'a> Server<'a> {
 
     pub fn serve<F>(&self, port: u16, handler: F) -> Vec<u8> 
     where 
-        F: Fn(&Header, &Vec<u8>) -> Result<Vec<u8>, Error> + Send + Sync + 'static
+        F: Fn(&Message) -> Result<Vec<u8>, Error> + Send + Sync + 'static
     {
         let handler_ref_arc = Arc::new(handler);
         let listener = TcpListener::bind(SocketAddr::from(([127, 0, 0, 1], port)),).unwrap();
@@ -105,7 +105,7 @@ impl<'a> Server<'a> {
 
     fn handle_message<F>(mut tcp: &TcpStream, header_size: usize, timeout: usize, handler: Arc<F>) -> Result<Response, Error>
     where 
-        F: Fn(&Header, &Vec<u8>) -> Result<Vec<u8>, Error> + Send + Sync
+        F: Fn(&Message) -> Result<Vec<u8>, Error> + Send + Sync
     {
         let header_size_less_one_byte = header_size - 1;
 
@@ -138,8 +138,9 @@ impl<'a> Server<'a> {
         tcp.take(header.message_length as u64).read_to_end(&mut data);
 
         debug!("received: {:?}", str::from_utf8(&data));
+        let message = Message{header, data};
 
-        match handler(&header, &data) {
+        match handler(&message) {
             Ok(resp) => Ok(Response::success(resp)),
             Err(e) => Ok(Response::error(format!("{}", e)))
         }
