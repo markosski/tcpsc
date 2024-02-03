@@ -3,7 +3,8 @@
 Testing server - client communication over TCP.
 
 * allow connection from multiple clients
-* establish long lived TCP connection
+* establish long lived TCP connection with timeout
+* use simple communication protocol (command_name, cliend_id, data)
 
 ## Running locally
 
