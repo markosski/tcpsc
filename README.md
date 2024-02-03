@@ -6,16 +6,16 @@ Testing server - client communication over TCP.
 * establish long lived TCP connection with timeout
 * use simple communication protocol (command_name, cliend_id, data)
 
-## Running locally
+## Running examples locally
 
 in terminal 1
 
-`cd server`
+`cd examples/server`
 
-`cargo run -- 7878`
+`RUST_LOG=debug cargo run -- 7878`
 
 in terminal 2
 
-`cd client`
+`cd examples/client`
 
-`cargo run -- 7878`
+`RUST_LOG=debug cargo run -- 7878`
