@@ -1,11 +1,12 @@
 use std::io::{stdin,stdout,Write};
 use std::env;
-use core::models::Header;
+use core::models::{Header, ResponseType};
 use core::utils;
 use core::client::Client;
-use std::str;
+extern crate env_logger;
 
 fn main() {
+    env_logger::init();
 
     let args: Vec<String> = env::args().collect();
     if args.len() != 2 {
@@ -22,11 +23,16 @@ fn main() {
             let data_bytes = data.into_bytes();
 
             let msg_type: [u8; 4] = utils::to_array::<4>("REQ ");
-            let msg_client_id: [u8; 8] = utils::to_array::<8>("abc12300");
+            let msg_client_id: [u8; 8] = utils::to_array::<8>("abc12345");
             let header = Header::new(msg_type, msg_client_id, data_bytes.len() as u32);
 
             match client.send(header, data_bytes) {
-                Ok(resp) => println!("{:?}", str::from_utf8(&resp)),
+                Ok(response) => {
+                    match response.response_type {
+                        ResponseType::SUCC => println!("{:?}", &response.success_as_string()),
+                        ResponseType::ERR => println!("{:?}", &response.error_as_string())
+                    }
+                },
                 Err(e) => println!("{}", e.to_string())
             }
         }

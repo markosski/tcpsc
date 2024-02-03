@@ -13,6 +13,7 @@ use std::sync::{Arc,Mutex,MutexGuard};
 use std::io::ErrorKind;
 use std::io::Read;
 use std::sync::mpsc;
+use log::{debug, info, warn, error};
 use crate::utils;
 use crate::models::{Header, Message, Response};
 
@@ -28,41 +29,50 @@ struct HandlerMessage {
 }
 
 impl<'a> Server<'a> {
-    pub fn new(header_size: usize, timeout_seconds: usize, thread_pool: &'a ThreadPool) -> Server {
+    pub fn new(thread_pool: &'a ThreadPool) -> Server {
         Server { 
-            header_size: header_size,
-            timeout_seconds: timeout_seconds,
+            header_size: 16,
+            timeout_seconds: 15,
             thread_pool: thread_pool
         }
     }
 
-    pub fn serve<F>(&self, port: u16, handler: Arc<F>) -> Vec<u8> 
+    pub fn set_header_size(&mut self, header_size: usize) {
+        self.header_size = header_size;
+    }
+
+    pub fn set_timeout(&mut self, timeout_seconds: usize) {
+        self.timeout_seconds = timeout_seconds;
+    }
+
+    pub fn serve<F>(&self, port: u16, handler: F) -> Vec<u8> 
     where 
-        F: Fn(&Vec<u8>, &Vec<u8>) -> Vec<u8> + Send + Sync + 'static
+        F: Fn(&Header, &Vec<u8>) -> Result<Vec<u8>, Error> + Send + Sync + 'static
     {
+        let handler_ref_arc = Arc::new(handler);
         let listener = TcpListener::bind(SocketAddr::from(([127, 0, 0, 1], port)),).unwrap();
 
-        println!("server started on port: {} with connection pool size: {}!", &port, &self.thread_pool.max_count());
+        info!("server started on port: {} with connection pool size: {}!", &port, &self.thread_pool.max_count());
         loop {
             match listener.accept() {
                 Ok((mut stream, addr)) => {
-                    println!("incoming connection from remote client: {}:{}", &addr.ip(), &addr.port());
+                    info!("incoming connection from remote client: {}:{}", &addr.ip(), &addr.port());
 
                     if self.thread_pool.active_count() == self.thread_pool.max_count() {
-                        println!("can't accept any more connections")
+                        error!("can't accept any more connections")
                     } else {
-                        let handler_ref = handler.clone();
+                        let handler_ref = handler_ref_arc.clone();
                         let header_size = self.header_size.clone();
                         let timeout_seconds = self.timeout_seconds.clone();
 
                         self.thread_pool.execute(move || {
-                            println!("starting session on thread {:?}...", &thread::current().id());
+                            info!("starting session on thread {:?}...", &thread::current().id());
 
                             loop {
                                 let mut tcp = match stream.try_clone() {
                                     Ok(ok) => ok,
                                     Err(err) => {
-                                        println!("error");
+                                        error!("{}", err);
                                         break;
                                     }
                                 };
@@ -73,64 +83,65 @@ impl<'a> Server<'a> {
                                 match response {
                                     Ok(resp) => {
                                         match tcp.write_all(&resp.to_bytes()[..]) {
-                                            Ok(ok) => println!("response sent successfully!"),
-                                            Err(err) => println!("error sending response; {}", err.to_string())
+                                            Ok(ok) => info!("response sent successfully!"),
+                                            Err(err) => error!("error sending response; {}", err.to_string())
                                         }
                                     }
                                     Err(err) => {
-                                        println!("handler did not complete successfully or client disconnected");
+                                        error!("request handler did not complete successfully or client disconnected");
                                         break;
                                     }
                                 }
                             }
 
-                            println!("session completed on thread {:?}", &thread::current().id());
+                            info!("session completed on thread {:?}", &thread::current().id());
                         });
                     }
                 },
-                Err(e) => println!("couldn't get client: {e:?}"),
+                Err(e) => error!("couldn't get client: {e:?}"),
             }
         } 
     }
 
     fn handle_message<F>(mut tcp: &TcpStream, header_size: usize, timeout: usize, handler: Arc<F>) -> Result<Response, Error>
     where 
-        F: Fn(&Vec<u8>, &Vec<u8>) -> Vec<u8> + Send + Sync
+        F: Fn(&Header, &Vec<u8>) -> Result<Vec<u8>, Error> + Send + Sync
     {
         let header_size_less_one_byte = header_size - 1;
 
-        println!("awaiting data...");
+        info!("awaiting data...");
         tcp.set_read_timeout(Some(Duration::from_secs(timeout as u64)));
 
         let mut format_buf: Vec<u8> = vec![];
         let mut peek_buf: Vec<u8> = vec![];
         tcp.take(1).read_to_end(&mut format_buf);
         if format_buf.len() > 0 {
-            println!("detected data");
+            debug!("detected data");
             tcp.set_read_timeout(Some(Duration::from_secs(5)));
         }
         tcp.take((Header::size() - 1) as u64).read_to_end(&mut format_buf);
         let header = Header::from_bytes(&format_buf)?;
-        println!("completed reading header...");
+        debug!("completed reading header...");
 
         let header_string = str::from_utf8(&format_buf[..]).unwrap();
 
         if header.message_length == 0 {
-            println!("message size is empty...");
+            debug!("message size is empty...");
             return Err(Error::new(ErrorKind::Other, "message size is empty"));
         } else {
-            println!("message size is: {}", &header.message_length);
+            debug!("message size is: {}", &header.message_length);
         }
 
-        println!("reading data...");
+        debug!("reading data...");
         let mut data: Vec<u8> = Vec::with_capacity(header.message_length as usize);
         tcp.read_exact(&mut data[..]);
         tcp.take(header.message_length as u64).read_to_end(&mut data);
 
-        println!("received: {:?}", str::from_utf8(&data));
+        debug!("received: {:?}", str::from_utf8(&data));
 
-        let mut data = handler(&format_buf, &data);
-        let data_size = data.len() as u32;
-        Ok(Response::new(data_size, data))
+        match handler(&header, &data) {
+            Ok(resp) => Ok(Response::success(resp)),
+            Err(e) => Ok(Response::error(format!("{}", e)))
+        }
     }    
 }
