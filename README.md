@@ -1,4 +1,4 @@
-# servertest
+# tcpsc - TCP Server / Client
 
 Testing server - client communication over TCP.
 
