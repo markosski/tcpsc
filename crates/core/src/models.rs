@@ -179,8 +179,8 @@ impl Response {
 
     pub fn from_buffer<T: Read>(buf: &mut BufReader<&mut T>) -> Result<Response> {
         let mut response_type: [u8; 4] = [0; 4];
-        buf.read_exact(&mut response_type)?;
-        let message_type_utf = str::from_utf8(&response_type).unwrap();
+        buf.read_exact(&mut response_type).unwrap();
+        let message_type_utf = str::from_utf8(&response_type)?;
         let response_type = ResponseType::from_str(message_type_utf);
 
         let mut response_length_bytes: [u8; 4] = [0; 4];
@@ -193,7 +193,7 @@ impl Response {
         match response_type {
             Ok(ResponseType::SUCC) => Ok(Response::success(body)),
             Ok(ResponseType::ERR) => {
-                let message_data_utf = str::from_utf8(&body).unwrap(); //TODO convert to Error
+                let message_data_utf = str::from_utf8(&body)?;
                 Ok(Response::error(message_data_utf.to_string()))
             },
             Err(_) => panic!("did not recognize response")

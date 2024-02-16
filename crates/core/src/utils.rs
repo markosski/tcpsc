@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::fmt;
 
-pub type Result<T> = std::result::Result<T, std::boxed::Box<dyn Error>>;
+pub type Result<T> = std::result::Result<T, std::boxed::Box<dyn Error + Send + Sync>>;
 
 #[derive(Debug)]
 pub struct GeneralError {

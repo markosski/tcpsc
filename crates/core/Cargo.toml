@@ -10,3 +10,5 @@ edition = "2021"
 [dependencies]
 threadpool = "*"
 log = "*"
+tokio-io-timeout = "*"
+tokio = {version = "1.36", features = ["rt-multi-thread", "net", "io-util"]}
